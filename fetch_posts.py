@@ -1,7 +1,9 @@
 from mastodon import Mastodon
 from bs4 import BeautifulSoup
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import datetime
 import sqlite3
+import torch
 import re
 
 # function to fetch latest n posts from an instance
@@ -16,12 +18,11 @@ def fetch_posts(query, instance, count):
     statuses = mastodon.timeline_hashtag(
         hashtag=query,
         limit=count)
-    
     return statuses
 
 def clean_statuses(statuses):
-    # Get plaintext post content
     for status in statuses:
+        # Extract post content from HTML
         content=''
         soup=BeautifulSoup(status['content'], 'html.parser')
         all_tags=soup.find_all()
@@ -36,6 +37,20 @@ def clean_statuses(statuses):
         else:
             pass
     return statuses
+
+def classify_statuses(statuses, tokenizer, model):
+
+    status_content=[status['content'] for status in statuses]
+    inputs = tokenizer(status_content, return_tensors="pt", truncation=True, padding=True, max_length=512)
+    with torch.no_grad():
+        outputs = model(**inputs)
+    probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
+    sentiment_map = {0: "Very Negative", 1: "Negative", 2: "Neutral", 3: "Positive", 4: "Very Positive"}
+    sentiments = [sentiment_map[p] for p in torch.argmax(probabilities, dim=-1).tolist()]
+    for i in range(len(statuses)):
+        statuses[i]['sentiment'] = sentiments[i]
+    return statuses
+
 
 # Insert into SQLite database - ignore duplicates
 def update_posts_db(statuses):
@@ -54,7 +69,7 @@ def update_posts_db(statuses):
             query,
             instance,
             status['content'],
-            "PLACEHOLDER"
+            status['sentiment']
         ))
 
     conn.commit()
@@ -66,7 +81,7 @@ def update_posts_db(statuses):
 def adapt_datetime_iso(val):
     """Adapt datetime.datetime to timezone-naive ISO 8601 date."""
     return val.replace(tzinfo=None).isoformat()
-3
+
 sqlite3.register_adapter(datetime.datetime, adapt_datetime_iso)
 
 def convert_datetime(val):
@@ -77,18 +92,26 @@ sqlite3.register_converter("datetime", convert_datetime)
 
 ########################################
 
-query="ai"
+model_name = "tabularisai/multilingual-sentiment-analysis"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSequenceClassification.from_pretrained(model_name)
+
+query="america"
 instance="https://mastodon.social"
 
-results = fetch_posts(query, instance, 5)
+results = fetch_posts(query, instance, 10)
 results = clean_statuses(results)
-update_posts_db(results)
+results = classify_statuses(results, tokenizer, model)
+for r in results:
+    print('////\n', r['content'], '\n', r['sentiment'],'\n')
+#update_posts_db(results)
 
-conn = sqlite3.connect("mastodon_posts.db")
-cur = conn.cursor()
 
-posts = cur.execute("SELECT * FROM posts")
-print(posts.fetchall()[-1])
 
+# conn = sqlite3.connect("mastodon_posts.db")
+# cur = conn.cursor()
+
+# posts = cur.execute("SELECT * FROM posts ORDER BY created_at DESC")
+# print(posts.fetchone(), len(posts.fetchall()))
 
 
