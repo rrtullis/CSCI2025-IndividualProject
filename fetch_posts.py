@@ -23,11 +23,10 @@ def fetch_posts(query, instance, count):
 def clean_statuses(statuses):
     for status in statuses:
         # Extract post content from HTML
-        content=''
         soup=BeautifulSoup(status['content'], 'html.parser')
-        all_tags=soup.find_all()
-        for tag in all_tags:
-            content+= tag.get_text()
+        for a in soup.find_all("a", href=True):
+            a.replace_with(a.get_text(strip=True))
+        content = soup.get_text(separator=" ", strip=True)
 
         # Remove extra tags at the end of content
         tags=re.finditer(' #', content)
@@ -35,7 +34,7 @@ def clean_statuses(statuses):
         if tags:
             status['content'] = content[:tags[-1].start()]
         else:
-            pass
+            status['content'] = content
     return statuses
 
 def classify_statuses(statuses, tokenizer, model):
@@ -96,7 +95,7 @@ model_name = "tabularisai/multilingual-sentiment-analysis"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSequenceClassification.from_pretrained(model_name)
 
-query="america"
+query="privacy"
 instance="https://mastodon.social"
 
 results = fetch_posts(query, instance, 10)
