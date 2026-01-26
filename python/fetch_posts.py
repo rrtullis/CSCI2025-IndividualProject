@@ -5,6 +5,7 @@ import torch
 import re
 
 # function to fetch latest n posts from an instance
+# it is horribly inefficient but it works. I will redo it if I have time later.
 def fetch_posts(query, instance, count, classify = False):
 
     # Set up Mastodon client
@@ -58,36 +59,24 @@ def fetch_posts(query, instance, count, classify = False):
         for i in range(len(statuses)):
             statuses[i]['sentiment'] = sentiments[i]
 
-
+    # stuff to make it possible to get these into R
+    # (clean up later)
     statuses=list(statuses)
-    clean_posts = []
-    for post in statuses:
-        post_dict = {}
-        for key, value in post.__dict__.items():
+    clean_statuses = []
+    for status in statuses:
+        status_dict = {}
+        for key, value in status.__dict__.items():
             # Keep only JSON-serializable types
-            if isinstance(value, (str, int, float, bool)) or value is None:
-                post_dict[key] = value
+            if isinstance(value, (str, int, float, bool)) or value is None or key == 'created_at': # the dates are stored in an odd way
+                status_dict[key] = value
             else:
-                # Replace nested objects with None
-                post_dict[key] = "R didn't like this"
-        clean_posts.append(post_dict)
+                # Replace nested objects with placeholder
+                status_dict[key] = "R didn't like this"
+        clean_statuses.append(status_dict)
 
-    return clean_posts  # list of simple dicts
-
-
-    # for status in statuses:
-    #     status['account'] = status['account']['acct']
-    #     del status['mentions']
-    #     del status['media_attachments']
-    #     del status['emojis']
-    #     del status['tags']
-    #     del status['filtered']
-    #     del status['quote_approval']
+    return clean_statuses  # list of simple dicts
 
 
-    # status_dicts = [status.__dict__ for status in statuses]
-    
-    # return status_dicts
 
 
 
