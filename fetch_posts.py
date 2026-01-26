@@ -5,7 +5,7 @@ import torch
 import re
 
 # function to fetch latest n posts from an instance
-def fetch_posts(query, instance, count):
+def fetch_posts(query, instance, count, classify = False):
 
     # Set up Mastodon client
     mastodon = Mastodon(
@@ -16,9 +16,7 @@ def fetch_posts(query, instance, count):
     statuses = mastodon.timeline_hashtag(
         hashtag=query,
         limit=count)
-    return statuses
 
-def clean_statuses(statuses):
     for status in statuses:
         # Extract post content from HTML
         soup=BeautifulSoup(status['content'], 'html.parser')
@@ -33,29 +31,33 @@ def clean_statuses(statuses):
             status['content'] = content[:tags[-1].start()]
         else:
             status['content'] = content
+
+        # safety net
+        if not classify:
+            status['sentiment'] = 'NA'
+
+    # classify status sentiment
+    if classify:
+        # params for classification procedure
+        model_name = "tabularisai/multilingual-sentiment-analysis"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSequenceClassification.from_pretrained(model_name)
+
+        # get and tokenize inputs
+        status_content=[status['content'] for status in statuses]
+        inputs = tokenizer(status_content, return_tensors="pt", truncation=True, padding=True, max_length=512)
+        
+        # classify and map into categorical score
+        with torch.no_grad():
+            outputs = model(**inputs)
+        probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
+        sentiment_map = {0: "Very Negative", 1: "Negative", 2: "Neutral", 3: "Positive", 4: "Very Positive"}
+        sentiments = [sentiment_map[p] for p in torch.argmax(probabilities, dim=-1).tolist()]
+        
+        # update statuses with new key-value pair
+        for i in range(len(statuses)):
+            statuses[i]['sentiment'] = sentiments[i]
+
     return statuses
-
-def classify_statuses(statuses, tokenizer, model):
-
-    status_content=[status['content'] for status in statuses]
-    inputs = tokenizer(status_content, return_tensors="pt", truncation=True, padding=True, max_length=512)
-    with torch.no_grad():
-        outputs = model(**inputs)
-    probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
-    sentiment_map = {0: "Very Negative", 1: "Negative", 2: "Neutral", 3: "Positive", 4: "Very Positive"}
-    sentiments = [sentiment_map[p] for p in torch.argmax(probabilities, dim=-1).tolist()]
-    for i in range(len(statuses)):
-        statuses[i]['sentiment'] = sentiments[i]
-    return statuses
-
-
-
-model_name = "tabularisai/multilingual-sentiment-analysis"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSequenceClassification.from_pretrained(model_name)
-
-query="privacy"
-instance="https://mastodon.social"
-
 
 
