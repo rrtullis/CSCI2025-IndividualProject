@@ -1,8 +1,6 @@
 from mastodon import Mastodon
 from bs4 import BeautifulSoup
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import datetime
-import sqlite3
 import torch
 import re
 
@@ -51,45 +49,6 @@ def classify_statuses(statuses, tokenizer, model):
     return statuses
 
 
-# Insert into SQLite database - ignore duplicates
-def update_posts_db(statuses):
-
-    # set up SQLite connection
-    conn = sqlite3.connect("mastodon_posts.db")
-    cur = conn.cursor()
-
-    for status in statuses:
-        cur.execute("""
-            INSERT OR IGNORE INTO posts (id, created_at, query, instance, content, sentiment)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            status["id"],
-            status["created_at"],
-            query,
-            instance,
-            status['content'],
-            status['sentiment']
-        ))
-
-    conn.commit()
-    conn.close()
-
-########################################
-# sqlite3 setup - the built-in datetime adapter was deprecated
-
-def adapt_datetime_iso(val):
-    """Adapt datetime.datetime to timezone-naive ISO 8601 date."""
-    return val.replace(tzinfo=None).isoformat()
-
-sqlite3.register_adapter(datetime.datetime, adapt_datetime_iso)
-
-def convert_datetime(val):
-    """Convert ISO 8601 datetime to datetime.datetime object."""
-    return datetime.datetime.fromisoformat(val.decode())
-
-sqlite3.register_converter("datetime", convert_datetime)
-
-########################################
 
 model_name = "tabularisai/multilingual-sentiment-analysis"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -98,19 +57,5 @@ model = AutoModelForSequenceClassification.from_pretrained(model_name)
 query="privacy"
 instance="https://mastodon.social"
 
-results = fetch_posts(query, instance, 10)
-results = clean_statuses(results)
-results = classify_statuses(results, tokenizer, model)
-for r in results:
-    print('////\n', r['content'], '\n', r['sentiment'],'\n')
-#update_posts_db(results)
-
-
-
-# conn = sqlite3.connect("mastodon_posts.db")
-# cur = conn.cursor()
-
-# posts = cur.execute("SELECT * FROM posts ORDER BY created_at DESC")
-# print(posts.fetchone(), len(posts.fetchall()))
 
 
