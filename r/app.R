@@ -15,6 +15,8 @@ fetch_posts <- import_from_path(
 
 ui <- fluidPage(
   textInput("query", "Query"),
+  numericInput("n","Number of posts", value = 10, min = 1, max = 200),
+  checkboxInput("classify", "Run sentiment analysis?"),
   actionButton("go", "Fetch"),
   tableOutput("results")
 )
@@ -25,20 +27,16 @@ server <- function(input, output) {
       fetch_posts$fetch_posts(
         query = input$query,
         instance = "https://mastodon.social",
-        count = 10,
-        classify = FALSE
+        count = input$n,
+        classify = input$classify
       )
     )
   })
 
-  observe({
-  print(class(posts()))
-  print(str(posts()))
-  })
-
   output$results <- renderTable({
-    df <- bind_rows(posts())
-    df
+    bind_rows(posts()) |>
+      select(created_at, content, sentiment)
+
   })
 }
 
