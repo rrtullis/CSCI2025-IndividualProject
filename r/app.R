@@ -125,7 +125,7 @@ server <- function(input, output) {
     }
   })
 
-  # one neat thing about Mastodon/it's API
+  # one neat thing about Mastodon/its API
   # is that there is no algorithm - posts are shown chronologically
   # so I can reliably fetch the latest n posts and have current information
   # but a downside to this is if you choose two queries with vastly different popularity
