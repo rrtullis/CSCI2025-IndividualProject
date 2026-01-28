@@ -1,6 +1,12 @@
-Explanation of files:
-db.py - the file that was used to create the SQLite database. 
-mastodon_posts.db - a database where fetched posts' relevant information is stored. Will likely be reset several times before the project is complete.
-fetch_posts.py - Contains functions to fetch, clean, and (eventually) rate the sentiment of posts. WIP.
+## Explanation of files
+```text
+├── python/
+├──── environment.yml        # Python environment file
+├──── fetch_posts.py         # script to fetch, clean, and analyze Mastodon posts
+├── r/        
+├──── app.R                  # Shiny app containing interactive plot generation
+├── renv/
+├── renv.lock                # R environment file
+└── README.md
+```
 
-Note on environment management: I am in the process of setting up Conda. I will push when setup is complete.
