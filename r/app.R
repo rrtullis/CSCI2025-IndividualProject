@@ -12,7 +12,7 @@ Sys.setenv(
 
 # load the environment used by fetch_posts
 use_condaenv("csci2025ip", required=TRUE)
-# 'import' fetch_posts so it can be used her
+# 'import' fetch_posts so it can be used here
 fetch_posts <- import_from_path(
   "fetch_posts",
   path = "../python"
@@ -131,7 +131,9 @@ server <- function(input, output) {
   # but a downside to this is if you choose two queries with vastly different popularity
   # it can make it look like no one was talking about x until just recently
   # and unfortunately I wasn't able to figure out how to fetch all posts
-  # about x and after date y
+  # about x and after date y.
+  # I supposes I could do some filtering tricks but I ran out of time
+  # plus I'd hate to fetch 100 posts and only use 4
 
   output$results_plot <- renderPlot({
     posts() |>
