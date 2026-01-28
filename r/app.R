@@ -137,7 +137,7 @@ server <- function(input, output) {
     posts() |>
       ggplot(aes(x=created_at, color=query)) +
       geom_freqpoly(binwidth=input$trends_bin_width * 60) +
-      labs(x="Datetime (UTC)", y=("# of posts"), color="Query", title = str_glue("Frequency distribution of the latest {input$n} posts by query")) +
+      labs(x="Datetime (UTC)", y=("# of posts"), color="Query", title = str_glue("Distribution of the latest {input$n} posts by query")) +
       theme_minimal()
   })
 
