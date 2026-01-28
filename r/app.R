@@ -31,13 +31,15 @@ ui <- fluidPage(
       numericInput("n","Number of posts to fetch (per query)", value = 10, min = 1, max = 200),
       # sentiment analysis takes extra time, so it is opt-in
       checkboxInput("classify", "Run sentiment analysis?"), 
+      checkboxInput("fit_cutoff", "Scale plots to known data?", value=TRUE),
       actionButton("fetch", "Fetch"),
     ),
     mainPanel(
       tabsetPanel(
         tabPanel(
           "Trend Plot", # I had an input I wanted to hide until posts were fetched
-          uiOutput("results_plot_ui") # hence the UI output
+          uiOutput("results_plot_ui"), # hence the UI output
+          textOutput("test")
         ),
         tabPanel(
           "Sentiment Plot", # the UI outputs also let me make nicer validation text
@@ -80,6 +82,20 @@ server <- function(input, output) {
       NULL # just in case, I guess
     }
   })
+
+  cutoff <- reactive({ # this is used for 'zooming' time-based plots to known data
+    req(posts())
+
+    cutoff <- posts() |>
+    group_by(query) |>
+    summarise(earliest = min(created_at), .groups = "drop") |>
+    summarise(cutoff = max(earliest)) |>
+    pull(cutoff)
+  })
+
+  output$test <- renderPrint(
+    str_glue("test: {cutoff()}")
+  )
 
   output$results_ui <- renderUI({
     # fetch == 0 ensures validation text is shown initially
@@ -132,15 +148,21 @@ server <- function(input, output) {
   # it can make it look like no one was talking about x until just recently
   # and unfortunately I wasn't able to figure out how to fetch all posts
   # about x and after date y.
-  # I supposes I could do some filtering tricks but I ran out of time
-  # plus I'd hate to fetch 100 posts and only use 4
 
   output$results_plot <- renderPlot({
-    posts() |>
+    results_plot <- posts() |>
       ggplot(aes(x=created_at, color=query)) +
       geom_freqpoly(binwidth=input$trends_bin_width * 60) +
       labs(x="Datetime (UTC)", y=("# of posts"), color="Query", title = str_glue("Distribution of the latest {input$n} posts by query")) +
       theme_minimal()
+    
+    if (input$fit_cutoff) { # ^ which is why we have this
+      results_plot + coord_cartesian(xlim=c(cutoff(), now()))
+    } else {
+      results_plot
+    }
+    
+    
   })
 
   output$results_sentiment_plot_ui <- renderUI({
