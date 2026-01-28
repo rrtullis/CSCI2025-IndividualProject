@@ -19,6 +19,7 @@ def fetch_posts(query, instance, count, classify = False):
         limit=count)
 
     for status in statuses:
+        status['query'] = query
         # Extract post content from HTML
         soup=BeautifulSoup(status['content'], 'html.parser')
         for a in soup.find_all("a", href=True):
