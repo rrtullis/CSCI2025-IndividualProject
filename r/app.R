@@ -39,7 +39,6 @@ ui <- fluidPage(
         tabPanel(
           "Trend Plot", # I had an input I wanted to hide until posts were fetched
           uiOutput("results_plot_ui"), # hence the UI output
-          textOutput("test")
         ),
         tabPanel(
           "Sentiment Plot", # the UI outputs also let me make nicer validation text
@@ -83,6 +82,8 @@ server <- function(input, output) {
     }
   })
 
+
+
   cutoff <- reactive({ # this is used for 'zooming' time-based plots to known data
     req(posts())
 
@@ -92,10 +93,6 @@ server <- function(input, output) {
     summarise(cutoff = max(earliest)) |>
     pull(cutoff)
   })
-
-  output$test <- renderPrint(
-    str_glue("test: {cutoff()}")
-  )
 
   output$results_ui <- renderUI({
     # fetch == 0 ensures validation text is shown initially
@@ -114,6 +111,12 @@ server <- function(input, output) {
         withSpinner(dataTableOutput("results"))
       )
     }
+  })
+
+  output$show_sentiment_post <- renderDT({
+    req(input$show_sentiment_post)
+      nearPoints(posts(), input$show_sentiment_post) |>
+        select(created_at, query, content, sentiment)
   })
 
   output$results <- renderDT({
@@ -156,12 +159,11 @@ server <- function(input, output) {
       labs(x="Datetime (UTC)", y=("# of posts"), color="Query", title = str_glue("Distribution of the latest {input$n} posts by query")) +
       theme_minimal()
     
-    if (input$fit_cutoff) { # ^ which is why we have this
+    if (input$fit_cutoff) { # ^ which is why we have this option
       results_plot + coord_cartesian(xlim=c(cutoff(), now()))
     } else {
       results_plot
     }
-    
     
   })
 
@@ -178,21 +180,27 @@ server <- function(input, output) {
       )
     } else {
       tagList(
-        withSpinner(plotOutput("results_sentiment_plot", height = 400)),
+        withSpinner(plotOutput("results_sentiment_plot", height = 400, click="show_sentiment_post")),
+        dataTableOutput("show_sentiment_post")
       )
     }
   })
 
-  # I had wanted to add onclick behavior to show the post content for this one
-  # but I couldn't find a good way to do that with a dotplot
-  # especially not a jittered dotplot
+  # disregard previous comment, I changed the plot and added click behavior
   output$results_sentiment_plot <- renderPlot({
-    posts() |>
+
+    results_sentiment_plot = posts() |>
       mutate(sentiment = factor(sentiment, c("Very Negative", "Negative", "Neutral", "Positive", "Very Positive"))) |>
-      ggplot(aes(x=sentiment, color=sentiment, fill=query)) +
-      labs(x="Sentiment", y=NULL, color="Sentiment", fill = "Query", title = str_glue("Sentiment distribution of the latest {input$n} posts by query")) +
+      ggplot(aes(x=created_at, y = sentiment, color=query)) +
+      labs(x="Time Created (UTC)", y="Sentiment", color = "Query", title = str_glue("Sentiment analysis of the latest {input$n} posts by query")) +
       theme_minimal() +
-      geom_dotplot(position="jitter")
+      geom_jitter(width=0, height=0.1, size = 4)
+
+      if (input$fit_cutoff) {
+        results_sentiment_plot + coord_cartesian(xlim=c(cutoff(), now()))
+      } else {
+        results_sentiment_plot
+      }
   })
 
 }
