@@ -28,7 +28,7 @@ ui <- fluidPage(
         placeholder = "e.g. cats\nprogramming\ntravel",
         rows = 5
       ),
-      numericInput("n","Number of posts to fetch (per query)", value = 10, min = 1, max = 200),
+      numericInput("n","Number of posts to fetch (per query)", value = 10, min = 1, max = 40),
       # sentiment analysis takes extra time, so it is opt-in
       checkboxInput("classify", "Run sentiment analysis?"), 
       checkboxInput("fit_cutoff", "Scale plots to known data?", value=TRUE),
@@ -57,23 +57,24 @@ server <- function(input, output) {
 
   posts <- eventReactive(input$fetch, {
     # split input string into distinct queries
-    queries <- strsplit(input$queries, "\n")[[1]] |> 
+    queries <- r_to_py({
+      strsplit(input$queries, "\n")[[1]] |> 
       trimws() |>
       discard(~ .x == "") |> # drop empty sections
       head(5) # and keep the first five
-
-    if (length(queries > 0)) {
+    })
+      
+    if (length(queries) > 0) {
       # get posts for each query
-      posts_list <- lapply(queries, function(q) {
-      py_to_r(
+      posts_list <- py_to_r({
         fetch_posts$fetch_posts(
-          query = q,
+          queries = queries,
           instance = "https://mastodon.social",
           count = input$n,
           classify = input$classify
         )
-      )
-    })
+      })
+
     # stick em together in a dataframe
     bind_rows(posts_list)
       
@@ -81,8 +82,6 @@ server <- function(input, output) {
       NULL # just in case, I guess
     }
   })
-
-
 
   cutoff <- reactive({ # this is used for 'zooming' time-based plots to known data
     req(posts())
